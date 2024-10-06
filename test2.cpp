@@ -5,22 +5,12 @@
 #include <sstream>
 #include <cmath>
 #include <unistd.h>
-#include <set> // Include this at the top
 using namespace std;
 
 /**
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
  **/
-typedef struct pod
-{
-    int id;
-    int type;
-    bool created;
-    bool path_defined;
-
-}pod;
-int indexPodId = 0;
 typedef struct tub
 {
     int id;
@@ -28,8 +18,6 @@ typedef struct tub
     int destination;
     int capacity;
     bool created;
-    float price;
-    pod podInc;
 }tub;
 typedef struct landing
 {
@@ -51,7 +39,15 @@ typedef struct buildings
     bool matched;
 } buildings;
 
-set<pair<int, int>> createdTubes;
+
+typedef struct pod
+{
+    int id;
+    int type;
+    bool created;
+    bool path_defined;
+
+}pod;
 
 std::vector<std::string> split(const std::string &str, char delimiter) {
     std::vector<std::string> tokens;
@@ -97,57 +93,36 @@ int tubMatching(landing_pad landPod, vector<buildings> &builds)
     {
         if (builds[j].matched == false)
         {
-            for (int i = 0; i < landPod.astronuts.size(); i++)
+
+        for (int i = 0; i < landPod.astronuts.size(); i++)
+        {
+            if ( landPod.astronuts[i] == builds[j].type)
             {
-                if ( landPod.astronuts[i] == builds[j].type)
-                {
-                    len++;
-                }
+                len++;
             }
-            if (len > max)
-            {
-                max = len;
-                id = builds[j].id;
-                index = j;
-            }
+        }
+        if (len > max)
+        {
+            max = len;
+            id = builds[j].id;
+            index = j;
+            // builds[j].type = -1;
+        }
         }
     }
     builds[index].matched = true;
+    // cerr << id << std::endl;
     return id;
 }
 
-bool checkTubCreated(int src, int dest)
+bool checkTubCreated(vector <tub> tubArr, int src, int dest)
 {
-    if (createdTubes.find({src, dest}) != createdTubes.end())
+    for (int i = 0; i < tubArr.size(); i++)
     {
-        // Tube already created, return false to avoid duplication
-        return false;
+        if (tubArr[i].source == src && tubArr[i].destination == dest)
+            return false;
     }
     return true;
-}
-std::vector<tub> getUniqueTubs(const std::vector<tub>& tubs) {
-    std::set<std::pair<int, int>> seenTubs; // To track unique (source, destination) pairs
-    std::vector<tub> uniqueTubs; // To store only unique tubs
-
-    for (const auto& t : tubs) {
-        // Skip if source and destination are the same
-        if (t.source == t.destination) {
-            continue;
-        }
-
-        // Create a pair of source and destination
-        std::pair<int, int> tubPair = {t.source, t.destination};
-
-        // Check if the tubPair is already seen
-        if (seenTubs.find(tubPair) == seenTubs.end()) {
-            // If not seen, add it to the uniqueTubs vector and mark it as seen
-            uniqueTubs.push_back(t);
-            seenTubs.insert(tubPair);
-        }
-    }
-
-    // Return the vector of unique tubs
-    return uniqueTubs;
 }
 int main()
 {
@@ -155,6 +130,7 @@ int main()
     vector<buildings> builds;
     landing_pad lpad;
     vector <landing_pad> landPods;
+    vector <tub> tubArr;
     int landPodSize = 0;
     vector <pod> pods;
     // game loop
@@ -165,7 +141,6 @@ int main()
             string building_properties;
     int test = 1;
     while (1) {
-    vector <tub> tubArr;
         int resources;
         cin >> resources; cin.ignore();
         int num_travel_routes;
@@ -176,8 +151,6 @@ int main()
             t.source = building_id_1;
             t.destination = building_id_2;
             t.capacity = capacity;
-            t.created = true;
-            t.podInc.created = true;
             tubArr.push_back(t);
         }
         int num_pods;
@@ -192,7 +165,6 @@ int main()
             arr.push_back(building_properties);
 
         }
-        
         // land
         for (int i = 0; i < arr.size(); i++)
         {
@@ -211,6 +183,7 @@ int main()
                 }
                 lpad.tubCreated = false;
                 landPods.push_back(lpad);
+                // cerr << "size " << landPods.size() << std::endl;
             }
             else
             {
@@ -235,8 +208,7 @@ int main()
                 {
                     if (tubArr[j].source == landPods[i].id)
                     {
-                        // cerr <<  "new builds src " << tubArr[j].source << " dest " << tubArr[j].destination << " created " <<tubArr[j].created << std::endl;
-                        landPods[i].tubs.push_back(tubArr[j]);
+                        landPods[i].tubs.push_back(tubArr[i]);
                     }
                 }
             }
@@ -251,83 +223,123 @@ int main()
         }
         int tubsN = 0;
         bool action = false;
-        int timesCreated = 0;
         if (test == 1)
         {
         for (int t1 = 0; t1 < landPods.size(); t1++)
         {
+            // if (landPodSize == landPods.size())
+            //     break;
             if (landPods[t1].tubCreated == false)
             {
-                timesCreated = 0;
+
             for(int e2 = 0; e2 < builds.size(); e2++)
             {
-                    int destination = tubMatching(landPods[t1], builds);
-                    if (timesCreated > 4)
-                        break;
-                    if (checkTubCreated(landPods[t1].id, destination))
-                    {
-                        tub t;
-                        t.source = landPods[t1].id;
-                        t.destination = destination;
-                        // cerr << "src " << t.source << " " << destination << std::endl;
-                        t.created = false;
-                        t.price = distance(landPods[t1].x, landPods[t1].y, builds[e2].x, builds[e2].y) * 10;
-                        t.podInc.created = false;
-                        landPods[t1].tubs.push_back(t);
-                        createdTubes.insert({t.source, t.destination}); // Track the created tube
-                        timesCreated++;
-                    }
 
+                if (resources > 0)
+                {
+                    action = true;
+                    int destination = tubMatching(landPods[t1], builds); 
+                    if (checkTubCreated(tubArr, landPods[t1].id, destination))
+                    {
+                        
+                    cout << "TUBE " << landPods[t1].id << " " << destination << ";";
+                    tub t;
+                    t.source = landPods[t1].id;
+                    t.destination = destination;
+                    tubArr.push_back(t);
+                    landPods[t1].tubs.push_back(t);
+                    // cerr << "distance " << distance(landPods[t1].x, landPods[t1].y, builds[e2].x, builds[e2].y) * 10 << std::endl;
+                    resources -= distance(landPods[t1].x, landPods[t1].y, builds[e2].x, builds[e2].y) * 10;
+                    }
+                }
             }
             }
             landPods[t1].tubCreated = true;
         }
 
         }
-        // tubArr.clear();
+        // for (int i = 0; i < tubArr.size(); i++)
+        // {
+        //     cerr << tubArr.
+        // }
 
-        for (int o = 0; o < landPods.size(); o++)
-        {
-
-            landPods[o].tubs = getUniqueTubs(landPods[o].tubs);
-            for (int k = 0; k < landPods[o].tubs.size(); k++)
-            {
-                cerr << landPods[o].tubs[k].source << " " << landPods[o].tubs[k].destination << std::endl;
-            }
-        }
-
-    
         bool a = false; 
         for (int j = 0; j < landPods.size(); j++)
         {
+
             int numsAstr = landPods[j].nums_atsr;
             for (int x = 0; x < landPods[j].tubs.size(); x++)
             {
-            cerr << "res " << resources << " price "  << landPods[j].tubs[x].price<< endl;
-                    if (resources >= landPods[j].tubs[x].price && !landPods[j].tubs[x].created)
-                    {
-                        action = true;
-                        cout << "TUBE " << landPods[j].tubs[x].source << " " << landPods[j].tubs[x].destination << ";";
-                        resources -= landPods[j].tubs[x].price;
-                        landPods[j].tubs[x].created = true;
-                    }
-                    if (resources - 1000 >= 0 && landPods[j].tubs[x].podInc.created == false && landPods[j].tubs[x].created == true)
-                    {
-                        action = true;
-                        cout << " POD ";
-                        cout << indexPodId  << " " << landPods[j].tubs[x].source << " " << landPods[j].tubs[x].destination << " " << landPods[j].tubs[x].source << ";";
-                        resources -= 1000;
-                        numsAstr -= 10;
-                        pods[x].created = true;
-                        landPods[j].tubs[x].podInc.created = true;
-                        indexPodId++;
-                    }
-                    a = true;
+                if (a &&  resources >= 1000)
+                {
+                    a = false;
+                    cout << ";";
+                }
+                if (resources >= 1000 && !pods[x].created)
+                {
+                    action = true;
+                    cout << " POD ";
+                    cout << pods[x].id  << " " << landPods[j].tubs[x].source << " " << landPods[j].tubs[x].destination << " " << landPods[j].tubs[x].source;
+                resources -= 1000;
+                numsAstr -= 10;
+                pods[x].created = true;
+                }
+                
+                // while (true && !pods[x].path_defined && pods[x].created)
+                // {
+                //     int len = checkTypeAst(landPods[j], builds[x].type);
+                //     if (len == 0)
+                //         break;
+                //     if (len && numsAstr)
+                //     {
+
+                //         action = true;
+                //         cout << " " << landPods[j].id << " " << builds[x].id;
+                //     }
+                //     numsAstr -= len;
+                // }
+                //     pods[x].path_defined = true;
+                a = true;
             }
+            // for (int x = 0; x < builds.size(); x++)
+            // {
+            //     if (a &&  resources >= 1000)
+            //     {
+            //         a = false;
+            //         cout << ";";
+            //     }
+            //     if (resources >= 1000 && !pods[x].created)
+            //     {
+            //         action = true;
+            //         cout << " POD ";
+            //         cout << pods[x].id  << " " << landPods[j].id << " " << builds[x].id << " " << landPods[j].id;
+            //     resources -= 1000;
+            //     numsAstr -= 10;
+            //     pods[x].created = true;
+            //     }
+                
+            //     while (true && !pods[x].path_defined && pods[x].created)
+            //     {
+            //         int len = checkTypeAst(landPods[j], builds[x].type);
+            //         if (len == 0)
+            //             break;
+            //         if (len && numsAstr)
+            //         {
+
+            //             action = true;
+            //             cout << " " << landPods[j].id << " " << builds[x].id;
+            //         }
+            //         numsAstr -= len;
+            //     }
+            //         pods[x].path_defined = true;
+            //     a = true;
+            // }
+
         }
                 if (!action)
                     cout << " WAIT ";
                 cout << std::endl;
+        test++;
         landPodSize = landPods.size();
     }
 }
