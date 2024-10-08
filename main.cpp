@@ -270,11 +270,13 @@ int teleporterMatching(landing_pad landPod, vector<buildings> &builds)
         len  = 0;
         for (int j = 0; j < landPod.astronuts.size(); j++)
         {
+            if (createdSources.find(builds[i].id) != createdSources.end())
+            {
+                // cerr << "break " << endl;
+                break;
+            }
             if (landPod.astronuts[j] == builds[i].type)
             {
-                // cerr << landPod.id << " " <<builds[i].id << " "<< landPod.astronuts[j] << " " << builds[i].type<< endl;
-                // return builds[i].id;
-                // id = builds[i].id;
                 len++;
             }
         }
@@ -346,8 +348,6 @@ int main()
                 {
                     lpad.astronuts.push_back(std::stoi(pad[j]));
                 }
-                // cerr <<lpad.astronuts.size() << " " <<  lpad.nums_atsr <<" "<< pad.size() <<endl;
-
                 lpad.tubCreated = false;
                 landPods.push_back(lpad);
             }
@@ -391,22 +391,6 @@ int main()
         int tubsN = 0;
         bool action = false;
         int timesCreated = 0;
-        // cerr << "size " << landPods.size() << endl;
-        // for (int i = 0; i < landPods.size(); i++)
-        // {
-        //     cerr << "id " << landPods[i].id;
-        //     if (landPods[i].id== 130)
-        //     {
-        //     for (int j = 0; j < landPods[i].astronuts.size(); j++)
-        //     {
-        //         cerr << " " << landPods[i].astronuts[j];
-        //     }
-                
-        //     }
-        //     cerr << endl;
-            
-        // }
-        // landPods = removeDuplicates(landPods);
         for (int t1 = 0; t1 < landPods.size(); t1++)
         {
             if (landPods[t1].tubCreated == false)
@@ -448,11 +432,11 @@ int main()
             }
                 if (landPods[t1].tubs.size() == 0)
                 {
-                        // cerr << "size " << landPods[t1].tubs.size() << endl; 
-                    // cerr << "pods" << endl;
                     int teleDest = teleporterMatching(landPods[t1], builds);
-                            // cerr << landPods[t1].id<< " here " << teleDest << endl;
-                    if (teleDest != -1 && teleportTocreate.find({landPods[t1].id, teleDest}) == teleportTocreate.end() && createdSources.find(landPods[t1].id) == createdSources.end() && createdSources.find(teleDest) == createdSources.end())
+                            cerr << landPods[t1].id<< " here " << teleDest << endl;
+                            Point hh = getXYById(teleDest, builds);
+                            cerr << "x " << landPods[t1].x << " y " << landPods[t1].y << endl;
+                    if (teleDest != -1 && teleportTocreate.find({landPods[t1].id, teleDest}) == teleportTocreate.end() && createdSources.find(landPods[t1].id) == createdSources.end())
                     {
                             teleportTocreate.insert({landPods[t1].id, teleDest});
                     }
@@ -480,15 +464,6 @@ int main()
                         landPods[j].tubs[x].created = true;
                         createdTubes.insert({landPods[j].tubs[x].source, landPods[j].tubs[x].destination});
                     }
-                    // if (resources - 5000 >= 0 && landPods[j].tubs[x].podInc.created == false && !landPods[j].tubs[x].teleportCreated && createdSources.find(landPods[j].tubs[x].source) == createdSources.end() && createdSources.find(landPods[j].tubs[x].destination) == createdSources.end())
-                    // {
-                    //     action = true;
-                    //     cout << "TELEPORT " << landPods[j].tubs[x].source << " " << landPods[j].tubs[x].destination << ";";
-                    //     resources -= 5000;
-                    //     createdTeleports.insert({landPods[j].tubs[x].source, landPods[j].tubs[x].destination});
-                    //     createdSources.insert(landPods[j].tubs[x].source);
-                    //     createdSources.insert(landPods[j].tubs[x].destination);
-                    // }
                     if (resources - 1000 >= 0 && landPods[j].tubs[x].podInc.created == false && landPods[j].tubs[x].created == true && createdTubes.find({landPods[j].tubs[x].source, landPods[j].tubs[x].destination}) != createdTubes.end())
                     {
                         action = true;
