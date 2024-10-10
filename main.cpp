@@ -269,39 +269,45 @@ bool checkIntersection(Point a, Point b, vector<tub> tubArr, vector <landing_pad
 }
 int tubMatching(landing_pad landPod, vector<buildings> &builds, vector <tub> tubArr, vector <landing_pad> landPods)
 {
-    int max = 0;
-    int len = 0;
-    int id = -1;
-    int index = -1;
-    double min = 2147483647;
+    double minDistance = std::numeric_limits<double>::max(); // Start with the maximum possible distance
+    int closestBuildingId = -1; // Id of the closest building found so far
+
+    // Iterate over all buildings
     for (int j = 0; j < builds.size(); j++)
     {
+        // Check if the building has already been matched
         if (MatchedTubes.find({landPod.id, builds[j].id}) == MatchedTubes.end())
         {
+            // Iterate over all astronauts in order of preference
             for (int i = 0; i < landPod.astronuts.size(); i++)
             {
-                if ( landPod.astronuts[i] == builds[j].type)
+                // Check if the building type matches the astronaut type
+                if (landPod.astronuts[i] == builds[j].type)
                 {
-                    id = builds[j].id;
-            // if (builds[j].id == 6 && landPod.id == 8)
-            // {
-            //     cerr << "here we go " << endl;
-            // }
-                    MatchedTubes.insert({landPod.id, id});
-                    return id;
-                    len++;
+                    // Calculate the distance to the building
+                    Point px = Point{builds[j].x, builds[j].y};
+                    double currentDistance = distance(Point{landPod.x, landPod.y}, px);
+
+                    // If the distance is smaller than the smallest distance found so far, update the smallest distance and the closest building id
+                    if (currentDistance < minDistance) {
+                        minDistance = currentDistance;
+                        closestBuildingId = builds[j].id;
+                    }
+
+                    // Break the loop over the astronauts since we found a match
+                    break;
                 }
-            }
-            if (len > max)
-            {
-                max = len;
-                id = builds[j].id;
-                index = j;
             }
         }
     }
-    MatchedTubes.insert({landPod.id, id});
-    return id;
+
+    // If a matching building was found, add it to the matched tubes
+    if (closestBuildingId != -1) {
+        MatchedTubes.insert({landPod.id, closestBuildingId});
+    }
+
+    // Return the id of the closest matching building, or -1 if no matching building was found
+    return closestBuildingId;
 }
 
 bool checkTubCreated(int src, int dest)
@@ -416,20 +422,21 @@ int teleporterMatching(landing_pad landPod, vector<buildings> &builds)
     return id;
 }
 
-void matchingLandpods(landing_pad& l, vector <landing_pad> &landPods, vector <tub> &tubArr, vector<buildings> &builds)
+void matchingLandpods(landing_pad& l, vector<landing_pad>& landPods, vector<tub>& tubArr, vector<buildings>& builds)
 {
-    double minDistance = std::numeric_limits<double>::max(); // Start with the maximum possible distance
-    int closestPadIndex = -1; // Index of the closest landing pad found so far
+    double minDistance = std::numeric_limits<double>::max();
+    int closestPadIndex = -1;
 
-    for (int i = 0; i < landPods.size(); i++)
+    for (int i = 0; i < landPods.size(); ++i)
     {
-        for (int j = 0; j < l.astronuts.size(); j++) // Iterate over all astronauts
+        for (const auto& astronaut : l.astronuts)
         {
-            if (landPodsTypes.find({landPods[i].id, l.astronuts[j]}) != landPodsTypes.end())
-            {   
+            if (landPodsTypes.find({landPods[i].id, astronaut}) != landPodsTypes.end())
+            {
                 Point px = Point{landPods[i].x, landPods[i].y};
                 double currentDistance = distance(Point{l.x, l.y}, px);
-                if (currentDistance < minDistance) {
+                if (currentDistance < minDistance)
+                {
                     minDistance = currentDistance;
                     closestPadIndex = i;
                 }
@@ -437,7 +444,8 @@ void matchingLandpods(landing_pad& l, vector <landing_pad> &landPods, vector <tu
         }
     }
 
-    if (closestPadIndex != -1) { // If a matching landing pad was found
+    if (closestPadIndex != -1)
+    {
         tub t;
         t.source = l.id;
         t.destination = landPods[closestPadIndex].id;
@@ -445,8 +453,8 @@ void matchingLandpods(landing_pad& l, vector <landing_pad> &landPods, vector <tu
         t.price = minDistance * 10;
         t.podInc.created = false;
         t.teleportCreated = false;
-        tubArr.push_back(t);
-        l.tubs.push_back(t);
+        tubArr.emplace_back(t);
+        l.tubs.emplace_back(t);
         createdTubes.insert({t.source, t.destination});
     }
 }
