@@ -30,6 +30,8 @@ typedef struct tub
     bool created;
     double price;
     pod podInc;
+    bool upgraded;
+    double sorting;
     bool teleportCreated;
 }tub;
 typedef struct Point {
@@ -58,8 +60,15 @@ bool isTeleports = false;
 set<pair<int, int>> createdTubes;
 set<pair<int, int>> MatchedTubes;
 std::set<int> createdSources;
+set<pair<int, int>>createdPods;
 set<pair<int, int>> createdTeleports;
 set<pair<int, int>> teleportTocreate;
+set<pair<int, int>> upgradedTubs;
+set<pair<int, int>> addedPods;
+std::multiset<int> PodMatched;
+// std::multiset<int> PodMatched;
+
+set<pair<int, int>> landPodsTypes;
 
 std::vector<std::string> split(const std::string &str, char delimiter) {
     std::vector<std::string> tokens;
@@ -117,6 +126,20 @@ std::vector<landing_pad> removeDuplicates(const std::vector<landing_pad>& landPo
     }
     return unique_landPads;
 }
+int countSubstringOccurrences(const std::string& str, const std::string& sub) {
+    if (sub.empty()) return 0;  // Prevent infinite loop if substring is empty
+
+    int count = 0;
+    size_t pos = str.find(sub);
+
+    while (pos != std::string::npos) {
+        count++;
+        // Move the position forward by the length of the substring
+        pos = str.find(sub, pos + sub.length());
+    }
+
+    return count;
+}
 double distance(Point p1, Point p2) {
     return sqrt(pow(p2.x - p1.x, 2) + pow(p2.y - p1.y, 2));
 }
@@ -137,26 +160,26 @@ bool segmentsIntersect(Point A, Point B, Point C, Point D) {
 // }
 
 // Function to check if a point is on a segment
-bool pointOnSegment(const Point& A, const Point& B, const Point& C) { 
-    const double epsilon = 0.0000001;
+bool pointOnSegment(Point& A, Point& B, Point& C) {
+    double epsilon = 0.0000001;
+    double distAB = distance(B, A);
+    double distAC = distance(A, C);
+    double distBC = distance(B, C);
 
-    // Check if C is collinear with A and B
-    if (std::fabs(distance(B, A) + distance(A, C) - distance(B, C)) >= epsilon) {
-        return false; // Not collinear
-    }
-
-    // Check if C is within the bounds of A and B
-    return (std::min(A.x, B.x) <= C.x && C.x <= std::max(A.x, B.x) &&
-            std::min(A.y, B.y) <= C.y && C.y <= std::max(A.y, B.y));
+    return (std::fabs((distAC + distBC) - distAB) < epsilon);
 }
-bool checkBuildingInter(Point src, Point dest, vector <buildings> &builds, vector <landing_pad> landPods, int id)
+bool checkBuildingInter(Point src, Point dest, vector <buildings> &builds, vector <landing_pad> landPods, int id, int destId)
 {
     for (int i = 0; i < builds.size(); i++)
     {
+        if (builds[i].id != destId)
+        {
+
         Point buildsXY = Point{builds[i].x, builds[i].y};
         if (pointOnSegment(src, dest, buildsXY))
         {
             return true;
+        }
         }
     }
     for (int i = 0; i < landPods.size(); i++)
@@ -167,7 +190,7 @@ bool checkBuildingInter(Point src, Point dest, vector <buildings> &builds, vecto
             // Point lXY = getXYByIdLand(landPods[i].id, landPods);
             if (id == 8 && landPods[i].id == 2)
             {
-                cerr << lXY.x << lXY.y << endl;
+                // cerr << lXY.x << lXY.y << endl;
             }
             if (pointOnSegment(src, dest, lXY))
             {
@@ -196,37 +219,61 @@ int checkTypeAst(landing_pad &landPods, int type)
         len = 10;
     return len;
 }
-int getClosestMatch(landing_pad landPod, vector<buildings> &builds)
+int getClosestMatch(landing_pad landPod, vector<buildings> &builds, int type)
 {
     double min = 2147483647;
     int id = -1;
     for (int i = 0; i < builds.size(); i++)
     {
-        if (MatchedTubes.find({landPod.id, builds[i].id}) == MatchedTubes.end())
+        if (builds[i].type == type)
         {
-            for (int j = 0; j < landPod.astronuts.size(); j++)
+            if (distance(Point{landPod.x, landPod.y}, Point{builds[i].x, builds[i].y}) < min)
             {
-                if ( landPod.astronuts[j] == builds[i].type)
-                {
-                    if (min > distance(Point{landPod.x, landPod.y}, Point{builds[i].x, builds[i].y}))
-                    {
-                        // cerr << "min " << min << endl;
-                        id = builds[i].id;
-                        min = distance(Point{landPod.x, landPod.y}, Point{builds[i].x, builds[i].y});
-                        break;
-                    }
-                }
+                min = distance(Point{landPod.x, landPod.y}, Point{builds[i].x, builds[i].y});
+                id = builds[i].id;
             }
         }
+        // if (MatchedTubes.find({landPod.id, builds[i].id}) == MatchedTubes.end())
+        // {
+        //     for (int j = 0; j < landPod.astronuts.size(); j++)
+        //     {
+        //         if ( landPod.astronuts[j] == builds[i].type)
+        //         {
+        //             if (min > distance(Point{landPod.x, landPod.y}, Point{builds[i].x, builds[i].y}))
+        //             {
+        //                 // cerr << "min " << min << endl;
+        //                 id = builds[i].id;
+        //                 min = distance(Point{landPod.x, landPod.y}, Point{builds[i].x, builds[i].y});
+        //                 break;
+        //             }
+        //         }
+        //     }
+        // }
     }
     return id;
 }
-int tubMatching(landing_pad landPod, vector<buildings> &builds)
+bool checkIntersection(Point a, Point b, vector<tub> tubArr, vector <landing_pad> landPods, vector<buildings> builds)
+{
+    for (int j = 0; j < landPods.size(); j++)
+    {
+
+        for (int i = 0; i <landPods[j].tubs.size(); i++)
+        {
+            if (segmentsIntersect(a, b, getXYByIdLand(landPods[j].tubs[i].source, landPods), getXYById(landPods[j].tubs[i].destination, builds)))
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+int tubMatching(landing_pad landPod, vector<buildings> &builds, vector <tub> tubArr, vector <landing_pad> landPods)
 {
     int max = 0;
     int len = 0;
     int id = -1;
     int index = -1;
+    double min = 2147483647;
     for (int j = 0; j < builds.size(); j++)
     {
         if (MatchedTubes.find({landPod.id, builds[j].id}) == MatchedTubes.end())
@@ -235,14 +282,13 @@ int tubMatching(landing_pad landPod, vector<buildings> &builds)
             {
                 if ( landPod.astronuts[i] == builds[j].type)
                 {
-                if (landPod.id == 3)
-                {
-                    // cerr << "m here " << builds[j].id << endl;
-                }
                     id = builds[j].id;
-                    // MatchedTubes.insert({landPod.id, id});
-                    // return id;
-                    // break;
+            // if (builds[j].id == 6 && landPod.id == 8)
+            // {
+            //     cerr << "here we go " << endl;
+            // }
+                    MatchedTubes.insert({landPod.id, id});
+                    return id;
                     len++;
                 }
             }
@@ -290,7 +336,13 @@ std::vector<tub> getUniqueTubs(const std::vector<tub>& tubs) {
     // Return the vector of unique tubs
     return uniqueTubs;
 }
+bool compareTubsByPrice(const tub& a, const tub& b) {
+    return a.price > b.price;
+}
 
+void sortTubsByPrice(std::vector<tub>& tubs) {
+    std::sort(tubs.begin(), tubs.end(), compareTubsByPrice);
+}
 // Point getXYById(int id, vector<buildings> &builds)
 // {
 //     Point p;
@@ -319,22 +371,22 @@ std::vector<tub> getUniqueTubs(const std::vector<tub>& tubs) {
 //     }
 //     return p;
 // }
-bool checkIntersection(Point a, Point b, vector<tub> tubArr, vector <landing_pad> landPods, vector<buildings> builds)
-{
-    for (int j = 0; j < landPods.size(); j++)
-    {
+// bool checkIntersection(Point a, Point b, vector<tub> tubArr, vector <landing_pad> landPods, vector<buildings> builds)
+// {
+//     for (int j = 0; j < landPods.size(); j++)
+//     {
 
-        for (int i = 0; i <landPods[j].tubs.size(); i++)
-        {
-            if (segmentsIntersect(a, b, getXYByIdLand(landPods[j].tubs[i].source, landPods), getXYById(landPods[j].tubs[i].destination, builds)))
-            {
-                // cerr << "inte trrue" << endl;
-                return true;
-            }
-        }
-    }
-    return false;
-}
+//         for (int i = 0; i <landPods[j].tubs.size(); i++)
+//         {
+//             if (segmentsIntersect(a, b, getXYByIdLand(landPods[j].tubs[i].source, landPods), getXYById(landPods[j].tubs[i].destination, builds)))
+//             {
+//                 // cerr << "inte trrue" << endl;
+//                 return true;
+//             }
+//         }
+//     }
+//     return false;
+// }
 int teleporterMatching(landing_pad landPod, vector<buildings> &builds)
 {
     int len = 0;
@@ -364,23 +416,60 @@ int teleporterMatching(landing_pad landPod, vector<buildings> &builds)
     return id;
 }
 
-int matchingLandpods(landing_pad l, vector <landing_pad> landPods, vector <tub> tubArr, vector<buildings> builds)
+void matchingLandpods(landing_pad& l, vector <landing_pad> &landPods, vector <tub> &tubArr, vector<buildings> &builds)
 {
-    int id = 0;
-    int len = 0;
-    int max = 0;
+    double minDistance = std::numeric_limits<double>::max(); // Start with the maximum possible distance
+    int closestPadIndex = -1; // Index of the closest landing pad found so far
+
     for (int i = 0; i < landPods.size(); i++)
     {
-        if (landPods[i].tubs.size() > 0 && !checkIntersection(Point{l.x,l.y} ,Point{landPods[i].x,landPods[i].y},tubArr, landPods, builds) && !checkBuildingInter(Point{l.x,l.y}, Point{landPods[i].x,landPods[i].y}, builds, landPods, landPods[i].id))
+        for (int j = 0; j < l.astronuts.size(); j++) // Iterate over all astronauts
         {
-            // int min = l.astronuts.size() < landPods[i].astronuts.size() ? l.astronuts.size() : landPods[i].astronuts.size();
-            // for (int j = 0; j < min; j++)
-            // {
-            //     if ()
-            // }
-            return landPods[i].id;
+            if (landPodsTypes.find({landPods[i].id, l.astronuts[j]}) != landPodsTypes.end())
+            {   
+                Point px = Point{landPods[i].x, landPods[i].y};
+                double currentDistance = distance(Point{l.x, l.y}, px);
+                if (currentDistance < minDistance) {
+                    minDistance = currentDistance;
+                    closestPadIndex = i;
+                }
+            }
         }
     }
+
+    if (closestPadIndex != -1) { // If a matching landing pad was found
+        tub t;
+        t.source = l.id;
+        t.destination = landPods[closestPadIndex].id;
+        t.created = false;
+        t.price = minDistance * 10;
+        t.podInc.created = false;
+        t.teleportCreated = false;
+        tubArr.push_back(t);
+        l.tubs.push_back(t);
+        createdTubes.insert({t.source, t.destination});
+    }
+}
+int typeBuildById(vector<buildings> builds, int id)
+{
+    for (int i = 0; i < builds.size(); i++)
+    {
+        if (builds[i].id == id)
+            return builds[i].type;
+    }
+    return -1;
+}
+
+bool checkDuplicatedType(landing_pad &l, int type, double distanceDest, vector<buildings> builds, int destId)
+{
+    for (int i= 0; i < l.tubs.size(); i++)
+    {
+        if (l.tubs[i].price <= (distanceDest * 10) && type == typeBuildById(builds, l.tubs[i].destination))
+        {
+            return false;
+        }
+    }
+    return true;
 }
 int main()
 {
@@ -492,19 +581,17 @@ int main()
                 timesCreated = 0;
                 for(int e2 = 0; e2 < builds.size(); e2++)
                 {
-
-                    // if (e2 > 11)
-                    //     break;
-                    int destination = tubMatching(landPods[t1], builds);
+                    int destination = tubMatching(landPods[t1], builds, tubArr, landPods);
                         if (timesCreated > 4)
                             break;
+                        int type = typeBuildById(builds, destination);
                         Point pxy = getXYById(destination, builds);
-                         
-                        if (checkTubCreated(landPods[t1].id, destination) && !checkIntersection(Point{landPods[t1].x,landPods[t1].y} , getXYById(destination, builds) ,tubArr, landPods, builds) && destination != -1 && !checkBuildingInter(Point{landPods[t1].x,landPods[t1].y}, pxy, builds, landPods, landPods[t1].id) && createdTubes.find({landPods[t1].id, destination}) ==createdTubes.end())
+                        if (checkDuplicatedType(landPods[t1], type, distance(Point{landPods[t1].x, landPods[t1].y}, pxy), builds, destination) && !checkBuildingInter(Point{landPods[t1].x, landPods[t1].y}, pxy, builds, landPods, landPods[t1].id, destination) && checkTubCreated(landPods[t1].id, destination) && !checkIntersection(Point{landPods[t1].x,landPods[t1].y} , getXYById(destination, builds) ,tubArr, landPods, builds) && destination != -1  && createdTubes.find({landPods[t1].id, destination}) ==createdTubes.end())
                         {
                             tub t;
                             t.source = landPods[t1].id;
                             t.destination = destination;
+                            landPodsTypes.insert({landPods[t1].id, type});
                             t.created = false;
                             t.price = distance(Point{landPods[t1].x, landPods[t1].y}, pxy) * 10;
                             t.podInc.created = false;
@@ -523,12 +610,14 @@ int main()
         for (int o = 0; o < landPods.size(); o++)
         {
             landPods[o].tubs = getUniqueTubs(landPods[o].tubs);
+            sortTubsByPrice(landPods[o].tubs);
         }
         isTeleports = true;
         for (int y = 0; y < landPods.size(); y++)
         {
-             if (landPods[y].tubs.size() == 0)
+             if (landPods[y].tubs.size() < 1)
             {
+                    matchingLandpods(landPods[y], landPods, tubArr, builds);
                     int teleDest = teleporterMatching(landPods[y], builds);
                     if (teleDest != -1 && teleportTocreate.find({landPods[y].id, teleDest}) == teleportTocreate.end() && createdSources.find(landPods[y].id) == createdSources.end())
                     {
@@ -539,11 +628,10 @@ int main()
         }
         for (int j = 0; j < landPods.size(); j++)
         {
-            int numsAstr = landPods[j].nums_atsr;
             for (int x = 0; x < landPods[j].tubs.size(); x++)
             {
                     Point pxy = getXYById(landPods[j].tubs[x].destination, builds);
-                    if (resources > landPods[j].tubs[x].price && !landPods[j].tubs[x].created && !checkIntersection(Point{landPods[j].x,landPods[j].y} , getXYById(landPods[j].tubs[x].destination, builds) ,tubArr, landPods, builds))
+                    if (resources >= landPods[j].tubs[x].price && !landPods[j].tubs[x].created )
                     {
                         action = true;
                         cout << "TUBE " << landPods[j].tubs[x].source << " " << landPods[j].tubs[x].destination << ";";
@@ -551,15 +639,19 @@ int main()
                         landPods[j].tubs[x].created = true;
                         createdTubes.insert({landPods[j].tubs[x].source, landPods[j].tubs[x].destination});
                     }
-                    if (resources - 1000 >= 0 && landPods[j].tubs[x].podInc.created == false && landPods[j].tubs[x].created == true && createdTubes.find({landPods[j].tubs[x].source, landPods[j].tubs[x].destination}) != createdTubes.end())
+                    if (resources - 1000 >= 0 && landPods[j].tubs[x].created == true && createdTubes.find({landPods[j].tubs[x].source, landPods[j].tubs[x].destination}) != createdTubes.end() && createdPods.find({landPods[j].tubs[x].source, landPods[j].tubs[x].destination}) == createdPods.end())
                     {
                         action = true;
                         cout << " POD ";
                         cout << indexPodId  << " " << landPods[j].tubs[x].source << " " << landPods[j].tubs[x].destination << " " << landPods[j].tubs[x].source << ";";
                         resources -= 1000;
-                        numsAstr -= 10;
                         pods[x].created = true;
                         landPods[j].tubs[x].podInc.created = true;
+                        string s;
+                        createdPods.insert({landPods[j].tubs[x].source, landPods[j].tubs[x].destination});
+                        s = to_string(indexPodId);
+                        s+= to_string(landPods[j].tubs[x].source);
+                        s+= to_string(landPods[j].tubs[x].destination);
                         indexPodId++;
                     }
             }
